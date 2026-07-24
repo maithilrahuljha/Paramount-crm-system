@@ -1,0 +1,199 @@
+{
+  "dashboard": {
+    "name": "Paramount Merchant Navy — Executive Sales Dashboard",
+    "description": "Executive KPI dashboard for lead pipeline, counselor performance and revenue. Rebuild in Looker Studio using this schema as the layout reference.",
+    "theme": {
+      "primaryColor": "#1a237e",
+      "accentColor": "#ffd700",
+      "secondaryColor": "#0d47a1",
+      "background": "#f4f6fb",
+      "font": "Roboto"
+    },
+    "dataSources": [
+      {
+        "id": "lead_register",
+        "name": "Lead_Register",
+        "connector": "Google Sheets",
+        "sheetTab": "Lead_Register",
+        "fields": [
+          { "name": "Lead ID", "type": "TEXT" },
+          { "name": "Timestamp", "type": "DATETIME" },
+          { "name": "Candidate Name", "type": "TEXT" },
+          { "name": "Email", "type": "TEXT" },
+          { "name": "Phone Number", "type": "TEXT" },
+          { "name": "Course Interested", "type": "TEXT" },
+          { "name": "Lead Source", "type": "TEXT" },
+          { "name": "Status", "type": "TEXT" },
+          { "name": "Remarks", "type": "TEXT" }
+        ]
+      },
+      {
+        "id": "followup_tracker",
+        "name": "Followup_Tracker",
+        "connector": "Google Sheets",
+        "sheetTab": "Followup_Tracker",
+        "fields": [
+          { "name": "Lead ID", "type": "TEXT" },
+          { "name": "Candidate Name", "type": "TEXT" },
+          { "name": "Phone Number", "type": "TEXT" },
+          { "name": "Priority", "type": "TEXT" },
+          { "name": "Followup Date", "type": "DATE" },
+          { "name": "Assigned Counselor", "type": "TEXT" },
+          { "name": "Status", "type": "TEXT" },
+          { "name": "Remarks", "type": "TEXT" }
+        ]
+      },
+      {
+        "id": "daily_sales_log",
+        "name": "Daily_Sales_Log",
+        "connector": "Google Sheets",
+        "sheetTab": "Daily_Sales_Log",
+        "fields": [
+          { "name": "Log Date", "type": "DATE" },
+          { "name": "Counselor Name", "type": "TEXT" },
+          { "name": "Total Calls Made", "type": "NUMBER" },
+          { "name": "New Leads Contacted", "type": "NUMBER" },
+          { "name": "Interviews Conducted", "type": "NUMBER" },
+          { "name": "Admissions Closed", "type": "NUMBER" },
+          { "name": "Daily Notes", "type": "TEXT" }
+        ]
+      }
+    ],
+    "calculatedFields": [
+      {
+        "name": "Conversion Rate",
+        "dataSource": "lead_register",
+        "formula": "COUNT_DISTINCT(CASE WHEN LOWER(Status) IN ('admitted','enrolled','closed','converted') THEN `Lead ID` END) / COUNT_DISTINCT(`Lead ID`)",
+        "format": "PERCENT"
+      },
+      {
+        "name": "Is Priority",
+        "dataSource": "followup_tracker",
+        "formula": "CASE WHEN REGEXP_MATCH(Priority, '^P[12].*') THEN 'P1/P2' ELSE 'Other' END"
+      }
+    ],
+    "pages": [
+      {
+        "name": "Executive Overview",
+        "layout": [
+          {
+            "type": "SCORECARD",
+            "title": "Total Leads",
+            "dataSource": "lead_register",
+            "metric": "COUNT_DISTINCT(Lead ID)",
+            "position": { "row": 1, "col": 1 }
+          },
+          {
+            "type": "SCORECARD",
+            "title": "Admissions Closed",
+            "dataSource": "lead_register",
+            "metric": "COUNT(Status) WHERE Status IN ('Admitted','Enrolled','Closed','Converted')",
+            "position": { "row": 1, "col": 2 }
+          },
+          {
+            "type": "SCORECARD",
+            "title": "Conversion Rate",
+            "dataSource": "lead_register",
+            "metric": "Conversion Rate",
+            "position": { "row": 1, "col": 3 }
+          },
+          {
+            "type": "SCORECARD",
+            "title": "Open P1/P2 Follow-ups",
+            "dataSource": "followup_tracker",
+            "metric": "COUNT(Lead ID) WHERE Is Priority = 'P1/P2' AND Status != 'Completed'",
+            "position": { "row": 1, "col": 4 }
+          },
+          {
+            "type": "TIME_SERIES",
+            "title": "Leads Over Time",
+            "dataSource": "lead_register",
+            "dimension": "Timestamp (Date)",
+            "metric": "Record Count",
+            "position": { "row": 2, "col": 1, "span": 2 }
+          },
+          {
+            "type": "PIE_CHART",
+            "title": "Lead Source Breakdown",
+            "dataSource": "lead_register",
+            "dimension": "Lead Source",
+            "metric": "Record Count",
+            "position": { "row": 2, "col": 3, "span": 2 }
+          },
+          {
+            "type": "BAR_CHART",
+            "title": "Leads by Course",
+            "dataSource": "lead_register",
+            "dimension": "Course Interested",
+            "metric": "Record Count",
+            "position": { "row": 3, "col": 1, "span": 2 }
+          },
+          {
+            "type": "BAR_CHART",
+            "title": "Counselor Leaderboard (Admissions)",
+            "dataSource": "daily_sales_log",
+            "dimension": "Counselor Name",
+            "metric": "SUM(Admissions Closed)",
+            "sort": "DESC",
+            "position": { "row": 3, "col": 3, "span": 2 }
+          },
+          {
+            "type": "TABLE",
+            "title": "Priority Follow-up Queue",
+            "dataSource": "followup_tracker",
+            "dimensions": ["Priority", "Candidate Name", "Phone Number", "Followup Date", "Assigned Counselor", "Status"],
+            "filter": "Is Priority = 'P1/P2'",
+            "sort": "Followup Date ASC",
+            "position": { "row": 4, "col": 1, "span": 4 }
+          }
+        ],
+        "filters": [
+          { "type": "DATE_RANGE", "appliesTo": ["lead_register", "daily_sales_log"] },
+          { "type": "DROPDOWN", "field": "Assigned Counselor", "dataSource": "followup_tracker" },
+          { "type": "DROPDOWN", "field": "Lead Source", "dataSource": "lead_register" }
+        ]
+      },
+      {
+        "name": "Daily Sales Activity",
+        "layout": [
+          {
+            "type": "TIME_SERIES",
+            "title": "Calls Made per Day",
+            "dataSource": "daily_sales_log",
+            "dimension": "Log Date",
+            "metric": "SUM(Total Calls Made)",
+            "position": { "row": 1, "col": 1, "span": 2 }
+          },
+          {
+            "type": "TIME_SERIES",
+            "title": "Admissions Closed per Day",
+            "dataSource": "daily_sales_log",
+            "dimension": "Log Date",
+            "metric": "SUM(Admissions Closed)",
+            "position": { "row": 1, "col": 3, "span": 2 }
+          },
+          {
+            "type": "TABLE",
+            "title": "Counselor Daily Detail",
+            "dataSource": "daily_sales_log",
+            "dimensions": ["Log Date", "Counselor Name", "Total Calls Made", "New Leads Contacted", "Interviews Conducted", "Admissions Closed"],
+            "sort": "Log Date DESC",
+            "position": { "row": 2, "col": 1, "span": 4 }
+          }
+        ]
+      }
+    ],
+    "sharing": {
+      "recommended": "Anyone with the link can VIEW; management editors added by email.",
+      "refreshCadence": "Data freshness: 15 minutes (Sheets connector default)"
+    }
+  },
+  "rebuildInstructions": [
+    "1. Go to https://lookerstudio.google.com → Create → Report.",
+    "2. Add data source → Google Sheets connector → select Lead_Register (repeat for Followup_Tracker and Daily_Sales_Log).",
+    "3. Recreate the pages/charts above; positions are grid hints (4 columns).",
+    "4. Apply theme colors: primary #1a237e, accent #ffd700, secondary #0d47a1.",
+    "5. Add the calculated fields listed under calculatedFields.",
+    "6. Share → 'Anyone with the link' (Viewer) and copy the report URL."
+  ]
+}

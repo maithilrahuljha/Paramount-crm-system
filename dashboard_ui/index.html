@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Paramount Merchant Navy — Sales Operations Dashboard" />
+  <title>⚓ Paramount Merchant Navy — Sales Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ===== Header ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-anchor">⚓</span>
+      <div>
+        <h1>Paramount Merchant Navy</h1>
+        <p>Sales Operations Command Center</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="refreshBtn" class="btn btn-outline" title="Refresh data now">⟳ Refresh</button>
+      <a id="quickAddBtn" class="btn btn-gold" href="#" target="_blank" rel="noopener">＋ Quick Add Lead</a>
+    </div>
+  </header>
+
+  <!-- ===== Status banner (shown while config is unconfigured or on errors) ===== -->
+  <div id="statusBanner" class="banner hidden"></div>
+
+  <main class="grid">
+    <!-- ===== Left column: KPIs ===== -->
+    <section class="col">
+      <h2 class="section-title">📊 Key Metrics</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiTodayLeads">—</div>
+          <div class="kpi-label">Today's New Leads</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiTotalLeads">—</div>
+          <div class="kpi-label">Total Leads</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" id="kpiAdmissions">—</div>
+          <div class="kpi-label">Admissions Closed</div>
+        </div>
+        <div class="kpi-card kpi-highlight">
+          <div class="kpi-value" id="kpiConversion">—</div>
+          <div class="kpi-label">Conversion Rate</div>
+        </div>
+      </div>
+
+      <h2 class="section-title">🧭 Lead Sources</h2>
+      <div class="card" id="sourceBreakdown">
+        <p class="muted">Waiting for data…</p>
+      </div>
+    </section>
+
+    <!-- ===== Right column: Priority Follow-ups ===== -->
+    <section class="col">
+      <h2 class="section-title">🔥 Priority Follow-ups <span class="pill" id="followupCount">0</span></h2>
+      <div class="card table-card">
+        <table id="followupTable">
+          <thead>
+            <tr>
+              <th>Priority</th>
+              <th>Candidate</th>
+              <th>Phone</th>
+              <th>Due</th>
+              <th>Counselor</th>
+            </tr>
+          </thead>
+          <tbody id="followupBody">
+            <tr><td colspan="5" class="muted">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="section-title">🆕 Latest Leads</h2>
+      <div class="card table-card">
+        <table id="leadsTable">
+          <thead>
+            <tr>
+              <th>Lead ID</th>
+              <th>Name</th>
+              <th>Course</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="leadsBody">
+            <tr><td colspan="4" class="muted">Waiting for data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>⚓ Paramount Merchant Navy CRM · $0 stack · GitHub Pages + Google Sheets</span>
+    <span id="lastUpdated">Last updated: never</span>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

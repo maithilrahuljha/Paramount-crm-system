@@ -1,0 +1,35 @@
+name: Monthly Lead Archive
+
+# On the 1st of every month at midnight UTC, moves completed/closed leads from
+# Lead_Register into a monthly archive tab so the working sheet stays fast.
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # 1st of every month at 00:00 UTC
+  workflow_dispatch: {}   # Allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  archive-leads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Archive completed leads
+        run: python scripts/archive_leads.py
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}

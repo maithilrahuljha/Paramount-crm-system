@@ -1,0 +1,13 @@
+{
+  "generated_at_utc": null,
+  "generated_at_ist": "not yet generated — run the Hourly KPI Aggregation workflow",
+  "total_leads": 0,
+  "todays_new_leads": 0,
+  "admissions_closed_total": 0,
+  "conversion_rate_pct": 0,
+  "priority_followups_count": 0,
+  "priority_followups": [],
+  "calls_made_today": 0,
+  "admissions_closed_today": 0,
+  "counselor_leaderboard": {}
+}
