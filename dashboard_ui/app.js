@@ -51,10 +51,11 @@ function parseCsv(text) {
 
 const $ = id => document.getElementById(id);
 
-const CLOSED_STATUSES = ['admitted', 'enrolled', 'closed', 'converted', 'admission closed'];
+// Status values that indicate a lead is completed/enrolled (will be counted as admissions)
+const CLOSED_STATUSES = ['admitted', 'enrolled', 'completed', 'closed', 'converted', 'admission closed'];
 
 function isConfigured(url) {
-  return url && !url.includes('REPLACE_') && !url.includes('XXXXX');
+  return url && !url.includes('REPLACE_') && !url.includes('XXXXX') && url.includes('docs.google.com');
 }
 
 /** Robustly check if a sheet timestamp is today (handles common formats). */
@@ -101,8 +102,11 @@ async function fetchCsv(url) {
 function renderKpis(leads) {
   const total = leads.length;
   const today = leads.filter(l => isToday(l['Timestamp'])).length;
-  const admissions = leads.filter(l =>
-    CLOSED_STATUSES.includes((l['Status'] || '').toLowerCase())).length;
+  
+  // Count admissions based on "Status" column (new column from Google Form)
+  const status = l => (l['Status'] || '').toLowerCase();
+  const admissions = leads.filter(l => CLOSED_STATUSES.includes(status(l))).length;
+  
   const conversion = total ? ((admissions / total) * 100).toFixed(1) + '%' : '0%';
 
   $('kpiTodayLeads').textContent = today;
@@ -159,7 +163,9 @@ function renderLeads(leads) {
   $('leadsBody').innerHTML = latest.length
     ? latest.map(l => {
         const status = (l['Status'] || 'New').trim();
-        const cls = CLOSED_STATUSES.includes(status.toLowerCase()) ? 'badge-closed' : 'badge-open';
+        // Check if status is a closed/admitted status
+        const isClosed = CLOSED_STATUSES.includes(status.toLowerCase());
+        const cls = isClosed ? 'badge-closed' : 'badge-open';
         return `<tr>
           <td>${escapeHtml(l['Lead ID'] || '—')}</td>
           <td>${escapeHtml(l['Candidate Name'] || '')}</td>
@@ -209,11 +215,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Quick Add button
   const quickAdd = $('quickAddBtn');
-  if (isConfigured(config.quickAddFormUrl)) quickAdd.href = config.quickAddFormUrl;
-  else quickAdd.addEventListener('click', e => {
-    e.preventDefault();
-    alert('Add your Google Form URL to dashboard_ui/config.js (quickAddFormUrl) first.');
-  });
+  if (isConfigured(config.quickAddFormUrl)) {
+    quickAdd.href = config.quickAddFormUrl;
+  } else {
+    quickAdd.addEventListener('click', e => {
+      e.preventDefault();
+      alert('Add your Google Form URL to dashboard_ui/config.js (quickAddFormUrl) first.');
+    });
+  }
 
   // Manual refresh
   $('refreshBtn').addEventListener('click', refresh);
