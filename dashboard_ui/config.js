@@ -12,7 +12,7 @@
 const config = {
   // Published CSV of the Lead_Register sheet
   leadRegisterCsvUrl:
-    'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7Jqtg0yQMYBIoZ2LTV9jJLFGtnaxfjA0hGcqjVOSK-l3ZjOUv6eOUTIVeazQX_Ao_JmuzVz7-eVCX/pubhtml',
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7Jqtg0yQMYBIoZ2LTV9jJLFGtnaxfjA0hGcqjVOSK-l3ZjOUv6eOUTIVeazQX_Ao_JmuzVz7-eVCX/pub?gid=1210441358&single=true&output=csv',
 
   // Published CSV of the Followup_Tracker sheet
   followupTrackerCsvUrl:
