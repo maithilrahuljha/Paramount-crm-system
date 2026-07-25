@@ -20,7 +20,7 @@ const config = {
 
   // "Quick Add Lead" button target (Lead Intake Google Form)
   quickAddFormUrl:
-    'https://docs.google.com/forms/d/REPLACE_FORM_ID/viewform',
+    'https://docs.google.com/forms/d/1wrN-HyT5qxTBdgi9Y6x3GbttBzLQHtQaE5sLuYu0zC4/viewform',
 
   // Optional: KPI snapshot committed hourly by GitHub Actions (fallback data)
   kpiSnapshotUrl: '../data/kpi_snapshot.json',
