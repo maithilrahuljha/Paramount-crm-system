@@ -12,11 +12,11 @@
 const config = {
   // Published CSV of the Lead_Register sheet
   leadRegisterCsvUrl:
-    'https://docs.google.com/spreadsheets/d/REPLACE_LEAD_REGISTER_ID/export?format=csv&gid=0',
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7Jqtg0yQMYBIoZ2LTV9jJLFGtnaxfjA0hGcqjVOSK-l3ZjOUv6eOUTIVeazQX_Ao_JmuzVz7-eVCX/pubhtml',
 
   // Published CSV of the Followup_Tracker sheet
   followupTrackerCsvUrl:
-    'https://docs.google.com/spreadsheets/d/REPLACE_FOLLOWUP_TRACKER_ID/export?format=csv&gid=0',
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vQBrIIkNmVzdoXgpK3xHiFPMFHSEDENI-rfwaPHQu01vEozHDpfYwT24YL25kwaIaiy_bi9hifrlm1e/pubhtml',
 
   // "Quick Add Lead" button target (Lead Intake Google Form)
   quickAddFormUrl:
