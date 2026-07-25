@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Constants
-CLOSED_STATUSES = {'enrolled', 'completed', 'admitted', 'closed', 'joined'}
+CLOSED_STATUSES = {'enrolled', 'completed'}
 FORM_RESPONSES_TAB = 'Form Responses 1'
 
 def get_client():
