@@ -1,18 +1,18 @@
-name: Hourly KPI Aggregation
+name: Morning Briefing - 8:30 AM IST
 
-# Pulls fresh data from Google Sheets every hour, computes KPIs, and commits
-# a lightweight JSON snapshot (data/kpi_snapshot.json) used by the dashboard.
+# Sends the daily sales briefing to Slack + Email every morning at 8:30 AM IST.
+# 8:30 AM IST = 3:00 AM UTC (IST is UTC+5:30)
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Top of every hour (UTC)
+    - cron: '0 3 * * *'  # 8:30 AM IST = 3:00 AM UTC
   workflow_dispatch: {}    # Allow manual runs from the Actions tab
 
 permissions:
-  contents: write  # Needed to commit the KPI snapshot back to the repo
+  contents: read
 
 jobs:
-  aggregate-kpis:
+  send-briefing:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,20 +28,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Aggregate KPIs from Google Sheets
-        run: python scripts/google_sheets_connector.py
+      - name: Send morning briefing (Slack + Email)
+        run: python scripts/send_slack_email.py
         env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          BRIEFING_RECIPIENTS: ${{ secrets.BRIEFING_RECIPIENTS }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-
-      - name: Commit KPI snapshot (if changed)
-        run: |
-          git config user.name "paramount-crm-bot"
-          git config user.email "actions@github.com"
-          git add data/kpi_snapshot.json docs/data/kpi_snapshot.json || true
-          if git diff --cached --quiet; then
-            echo "No KPI changes to commit."
-          else
-            git commit -m "chore: hourly KPI snapshot [skip ci]"
-            git push
-          fi
