@@ -8,7 +8,7 @@
 
 | Form | When to Use | Link |
 |---|---|---|
-| **1. Paramount Lead Intake Form** | Every time a NEW enquiry comes in (call, walk-in, WhatsApp, social media) | `PASTE_FORM_1_LINK_HERE` |
+| **1. Paramount Lead Intake Form** | Every time a NEW enquiry comes in (call, walk-in, WhatsApp, social media) | `(https://forms.gle/mVXsGRHtcCkonNdu6)` |
 | **2. Followup & Callback Log Form** | After EVERY follow-up call — success or not | `PASTE_FORM_2_LINK_HERE` |
 | **3. Daily Counselor Sales Report Form** | Once per day, before 7:00 PM | `PASTE_FORM_3_LINK_HERE` |
 
