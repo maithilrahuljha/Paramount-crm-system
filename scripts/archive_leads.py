@@ -1,122 +1,171 @@
+#!/usr/bin/env python3
 """
-archive_leads.py
-================
-Paramount Merchant Navy CRM — Monthly lead archiver.
-
-What this script does (run monthly by .github/workflows/monthly_archive.yml):
-    1. Opens the Lead_Register spreadsheet via the service account.
-    2. Finds all leads whose Status is completed/closed (see CLOSED_STATUSES).
-    3. Appends them to an "Archive_YYYY_MM" tab (created if missing) inside
-       the same spreadsheet — one batch append, quota friendly.
-    4. Deletes the archived rows from the live tab (bottom-up so row indexes
-       stay valid).
-
-Safety features:
-    * Dry-run mode: set DRY_RUN=true to preview without changing anything.
-    * Nothing is deleted unless the archive append succeeded first.
-    * Exponential backoff on every API call.
-
-Required environment variables (GitHub Secrets):
-    GOOGLE_SERVICE_ACCOUNT_JSON  Service-account JSON key.
-    DRIVE_FOLDER_ID              Paramount_CRM_Data folder ID.
+Paramount Merchant Navy - Monthly Lead Archive
+Moves completed/enrolled leads to an archive tab
+Runs on the 1st of every month
 """
-
-from __future__ import annotations
 
 import os
+import json
 import sys
-from datetime import datetime, timedelta, timezone
-
 import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime, timedelta
+import logging
+import time
 
-from google_sheets_connector import (
-    CLOSED_STATUSES,
-    IST,
-    SHEET_LEAD_REGISTER,
-    get_client,
-    open_spreadsheet,
-    with_backoff,
-)
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
+# Constants
+CLOSED_STATUSES = {'enrolled', 'completed', 'admitted', 'closed', 'joined'}
+SHEET_LEAD_REGISTER = 'Lead_Register'
+IST = timezone(timedelta(hours=5, minutes=30))
 
-def get_archive_tab(spreadsheet, header: list[str]):
-    """Return (creating if needed) this month's archive worksheet."""
-    # Archive is named for the month that just ENDED (runs on the 1st).
-    last_month = (datetime.now(IST).replace(day=1) - timedelta(days=1))
+def get_client():
+    """Authenticate and return Google Sheets client"""
+    try:
+        service_account_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+        if not service_account_json:
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
+        
+        creds_dict = json.loads(service_account_json)
+        scope = ['https://spreadsheets.google.com/feeds', 
+                 'https://www.googleapis.com/auth/drive']
+        
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        logger.info("✅ Successfully authenticated with Google Sheets API")
+        return client
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to authenticate: {str(e)}")
+        raise
+
+def with_backoff(func, *args, **kwargs):
+    """Execute function with exponential backoff on rate limits"""
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except gspread.exceptions.APIError as e:
+            if 'Quota exceeded' in str(e) or 'Rate limit' in str(e):
+                wait_time = 2 ** attempt
+                logger.warning(f"Rate limit hit. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise
+    raise Exception("Max retries exceeded")
+
+def find_spreadsheet_by_name(client, folder_id, sheet_name):
+    """Find a spreadsheet by name in a specific folder"""
+    try:
+        query = f"'{folder_id}' in parents and name='{sheet_name}' and mimeType='application/vnd.google-apps.spreadsheet'"
+        results = client.list_spreadsheet_files(query=query)
+        
+        if not results:
+            raise ValueError(f"Spreadsheet '{sheet_name}' not found in folder")
+        
+        return results[0]['id']
+        
+    except Exception as e:
+        logger.error(f"❌ Error finding spreadsheet '{sheet_name}': {str(e)}")
+        raise
+
+def get_archive_tab(spreadsheet, header):
+    """Get or create this month's archive tab"""
+    # Archive is named for the month that just ended (runs on the 1st)
+    last_month = (datetime.now() - timedelta(days=1)).replace(day=1)
     tab_name = f"Archive_{last_month.strftime('%Y_%m')}"
+    
     try:
         ws = spreadsheet.worksheet(tab_name)
+        logger.info(f"Using existing archive tab: {tab_name}")
     except gspread.WorksheetNotFound:
         ws = with_backoff(
             spreadsheet.add_worksheet, tab_name, rows=1000, cols=len(header) + 2
         )
         with_backoff(ws.append_row, header, value_input_option="RAW")
-        print(f"Created archive tab: {tab_name}")
+        logger.info(f"Created new archive tab: {tab_name}")
+    
     return ws
 
-
-def main() -> int:
-    """Archive completed leads out of the live Lead_Register tab."""
+def main():
+    """Archive completed leads out of the live Lead_Register tab"""
     dry_run = os.environ.get("DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
-
+    
     try:
+        folder_id = os.environ.get('DRIVE_FOLDER_ID')
+        if not folder_id:
+            raise ValueError("DRIVE_FOLDER_ID environment variable not set")
+        
+        # Authenticate
         client = get_client()
-        spreadsheet = open_spreadsheet(client, SHEET_LEAD_REGISTER)
-        if spreadsheet is None:
-            return 1
-
-        live = spreadsheet.sheet1
+        
+        # Find the Lead_Register spreadsheet
+        spreadsheet_id = find_spreadsheet_by_name(client, folder_id, SHEET_LEAD_REGISTER)
+        spreadsheet = client.open_by_key(spreadsheet_id)
+        logger.info(f"✅ Opened spreadsheet: {spreadsheet.title}")
+        
+        # Get the first sheet (Form Responses 1 or Lead_Register)
+        live = spreadsheet.get_worksheet(0)
         all_values = with_backoff(live.get_all_values)
+        
         if len(all_values) < 2:
-            print("Lead_Register is empty — nothing to archive.")
+            logger.info("Lead_Register is empty — nothing to archive.")
             return 0
-
-        header, rows = all_values[0], all_values[1:]
-
-        # Locate the Status column (case-insensitive).
+        
+        header = all_values[0]
+        rows = all_values[1:]
+        
+        # Find the Status column
         try:
             status_idx = [h.strip().lower() for h in header].index("status")
+            logger.info(f"Found 'Status' column at index {status_idx}")
         except ValueError:
-            print("ERROR: 'Status' column not found in Lead_Register header.")
+            logger.error("❌ 'Status' column not found in Lead_Register header.")
+            logger.info(f"Headers found: {header}")
             return 1
-
-        # Collect (sheet_row_number, row_values) for completed leads.
-        to_archive = [
-            (i + 2, row)  # +2 => 1-based rows + header row
-            for i, row in enumerate(rows)
-            if len(row) > status_idx
-            and row[status_idx].strip().lower() in CLOSED_STATUSES
-        ]
-
+        
+        # Collect rows with closed statuses
+        to_archive = []
+        for i, row in enumerate(rows):
+            if len(row) > status_idx:
+                status = row[status_idx].strip().lower()
+                if status in CLOSED_STATUSES:
+                    to_archive.append((i + 2, row))  # +2 for header row
+        
         if not to_archive:
-            print("No completed leads to archive this month.")
+            logger.info("No completed leads to archive this month.")
             return 0
-
-        print(f"Found {len(to_archive)} completed lead(s) to archive.")
+        
+        logger.info(f"Found {len(to_archive)} completed lead(s) to archive.")
+        
         if dry_run:
             for rownum, row in to_archive:
-                print(f"  [dry-run] would archive row {rownum}: {row[:3]}")
+                logger.info(f"  [DRY-RUN] would archive row {rownum}: {row[:3]}")
             return 0
-
-        # 1) Append to archive tab in ONE batch call.
+        
+        # 1) Append to archive tab in ONE batch
         archive_ws = get_archive_tab(spreadsheet, header)
         with_backoff(
             archive_ws.append_rows,
             [row for _, row in to_archive],
-            value_input_option="RAW",
+            value_input_option="RAW"
         )
-        print(f"Appended {len(to_archive)} row(s) to '{archive_ws.title}'.")
-
-        # 2) Delete from live tab bottom-up so indexes remain valid.
+        logger.info(f"✅ Appended {len(to_archive)} row(s) to '{archive_ws.title}'.")
+        
+        # 2) Delete from live tab bottom-up
         for rownum, _ in sorted(to_archive, key=lambda t: t[0], reverse=True):
             with_backoff(live.delete_rows, rownum)
-        print(f"Removed {len(to_archive)} row(s) from the live Lead_Register.")
+        
+        logger.info(f"✅ Removed {len(to_archive)} row(s) from the live Lead_Register.")
         return 0
-
+        
     except Exception as exc:
-        print(f"FATAL: monthly archive failed: {exc}")
+        logger.error(f"❌ FATAL: monthly archive failed: {exc}")
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
