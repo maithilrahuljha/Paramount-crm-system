@@ -10,7 +10,7 @@ import json
 import sys
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import logging
 import time
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Constants
 CLOSED_STATUSES = {'enrolled', 'completed', 'admitted', 'closed', 'joined'}
 SHEET_LEAD_REGISTER = 'Lead_Register'
-IST = timezone(timedelta(hours=5, minutes=30))
+FORM_RESPONSES_TAB = 'Form Responses 1'  # The tab where form data is stored
 
 def get_client():
     """Authenticate and return Google Sheets client"""
@@ -61,13 +61,15 @@ def with_backoff(func, *args, **kwargs):
 def find_spreadsheet_by_name(client, folder_id, sheet_name):
     """Find a spreadsheet by name in a specific folder"""
     try:
-        query = f"'{folder_id}' in parents and name='{sheet_name}' and mimeType='application/vnd.google-apps.spreadsheet'"
-        results = client.list_spreadsheet_files(query=query)
+        folder = client.open_by_key(folder_id)
+        files = folder.list_spreadsheet_files()
         
-        if not results:
-            raise ValueError(f"Spreadsheet '{sheet_name}' not found in folder")
+        for file in files:
+            if file['name'] == sheet_name:
+                logger.info(f"✅ Found spreadsheet: {sheet_name} (ID: {file['id']})")
+                return file['id']
         
-        return results[0]['id']
+        raise ValueError(f"Spreadsheet '{sheet_name}' not found in folder")
         
     except Exception as e:
         logger.error(f"❌ Error finding spreadsheet '{sheet_name}': {str(e)}")
@@ -108,12 +110,19 @@ def main():
         spreadsheet = client.open_by_key(spreadsheet_id)
         logger.info(f"✅ Opened spreadsheet: {spreadsheet.title}")
         
-        # Get the first sheet (Form Responses 1 or Lead_Register)
-        live = spreadsheet.get_worksheet(0)
+        # Get the "Form Responses 1" tab where form data is stored
+        try:
+            live = spreadsheet.worksheet(FORM_RESPONSES_TAB)
+            logger.info(f"✅ Using tab: {FORM_RESPONSES_TAB}")
+        except gspread.WorksheetNotFound:
+            # Fallback to first sheet if tab not found
+            live = spreadsheet.get_worksheet(0)
+            logger.info(f"⚠️ Using first sheet instead: {live.title}")
+        
         all_values = with_backoff(live.get_all_values)
         
         if len(all_values) < 2:
-            logger.info("Lead_Register is empty — nothing to archive.")
+            logger.info(f"No data found in {live.title} — nothing to archive.")
             return 0
         
         header = all_values[0]
@@ -124,7 +133,7 @@ def main():
             status_idx = [h.strip().lower() for h in header].index("status")
             logger.info(f"Found 'Status' column at index {status_idx}")
         except ValueError:
-            logger.error("❌ 'Status' column not found in Lead_Register header.")
+            logger.error("❌ 'Status' column not found in header.")
             logger.info(f"Headers found: {header}")
             return 1
         
@@ -160,7 +169,7 @@ def main():
         for rownum, _ in sorted(to_archive, key=lambda t: t[0], reverse=True):
             with_backoff(live.delete_rows, rownum)
         
-        logger.info(f"✅ Removed {len(to_archive)} row(s) from the live Lead_Register.")
+        logger.info(f"✅ Removed {len(to_archive)} row(s) from the live {live.title}.")
         return 0
         
     except Exception as exc:
