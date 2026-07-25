@@ -10,7 +10,7 @@ import json
 import sys
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import time
 
@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CLOSED_STATUSES = {'enrolled', 'completed', 'admitted', 'closed', 'joined'}
-SHEET_LEAD_REGISTER = 'Lead_Register'
-FORM_RESPONSES_TAB = 'Form Responses 1'  # The tab where form data is stored
+FORM_RESPONSES_TAB = 'Form Responses 1'
 
 def get_client():
     """Authenticate and return Google Sheets client"""
@@ -58,23 +57,6 @@ def with_backoff(func, *args, **kwargs):
                 raise
     raise Exception("Max retries exceeded")
 
-def find_spreadsheet_by_name(client, folder_id, sheet_name):
-    """Find a spreadsheet by name in a specific folder"""
-    try:
-        folder = client.open_by_key(folder_id)
-        files = folder.list_spreadsheet_files()
-        
-        for file in files:
-            if file['name'] == sheet_name:
-                logger.info(f"✅ Found spreadsheet: {sheet_name} (ID: {file['id']})")
-                return file['id']
-        
-        raise ValueError(f"Spreadsheet '{sheet_name}' not found in folder")
-        
-    except Exception as e:
-        logger.error(f"❌ Error finding spreadsheet '{sheet_name}': {str(e)}")
-        raise
-
 def get_archive_tab(spreadsheet, header):
     """Get or create this month's archive tab"""
     # Archive is named for the month that just ended (runs on the 1st)
@@ -98,19 +80,19 @@ def main():
     dry_run = os.environ.get("DRY_RUN", "").strip().lower() in {"1", "true", "yes"}
     
     try:
-        folder_id = os.environ.get('DRIVE_FOLDER_ID')
-        if not folder_id:
-            raise ValueError("DRIVE_FOLDER_ID environment variable not set")
+        # Get the spreadsheet ID from environment
+        spreadsheet_id = os.environ.get('SPREADSHEET_ID')
+        if not spreadsheet_id:
+            raise ValueError("SPREADSHEET_ID environment variable not set")
         
         # Authenticate
         client = get_client()
         
-        # Find the Lead_Register spreadsheet
-        spreadsheet_id = find_spreadsheet_by_name(client, folder_id, SHEET_LEAD_REGISTER)
+        # Open the spreadsheet directly using its ID
         spreadsheet = client.open_by_key(spreadsheet_id)
-        logger.info(f"✅ Opened spreadsheet: {spreadsheet.title}")
+        logger.info(f"✅ Opened spreadsheet: {spreadsheet.title} (ID: {spreadsheet_id})")
         
-        # Get the "Form Responses 1" tab where form data is stored
+        # Get the "Form Responses 1" tab
         try:
             live = spreadsheet.worksheet(FORM_RESPONSES_TAB)
             logger.info(f"✅ Using tab: {FORM_RESPONSES_TAB}")
